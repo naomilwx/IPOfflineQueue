@@ -7,7 +7,7 @@ Pod::Spec.new do |s|
 
   s.license      = 'MIT'
   s.author       = { "Shay Erlichmen" => "shay@shakka.me" }
-  s.source       = { :git => "https://github.com/shakkame/IPOfflineQueue.git", :tag => "0.0.4" }
+  s.source       = { :git => "https://github.com/naomilwx/IPOfflineQueue.git", :tag => "0.0.4" }
 
   s.source_files = 'Classes/IPOfflineQueue.{h,m}'
 
