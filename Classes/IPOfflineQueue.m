@@ -163,6 +163,7 @@ static NSMutableSet *_activeQueues = nil;
                  raise];
             }
             
+            [self clearOperations];
         } else {
             isNewQueue = NO;
         };
@@ -273,6 +274,12 @@ static NSMutableSet *_activeQueues = nil;
         }
         
         [rs close];
+    }];
+}
+
+- (void)clearOperations{
+    [self backgroundTaskBlock:^{
+        [_operationQueue cancelAllOperations];
     }];
 }
 
