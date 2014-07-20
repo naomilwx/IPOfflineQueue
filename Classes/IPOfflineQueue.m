@@ -163,7 +163,6 @@ static NSMutableSet *_activeQueues = nil;
                  raise];
             }
             
-            [self clear];
         } else {
             isNewQueue = NO;
         };
