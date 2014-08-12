@@ -6,6 +6,7 @@
 #import "FMDatabaseQueue.h"
 #import "Reachability.h"
 #import "DDLog.h"
+#import <RestKit/RestKit.h>
 
 static const int ddLogLevel = LOG_LEVEL_INFO;
 
@@ -52,7 +53,7 @@ static NSMutableSet *_activeQueues = nil;
                 _activeQueues = [[NSMutableSet alloc] initWithObjects:name, nil];
             }
         }
-    
+        
         _name = name;
         
         NSString *dbPath = [[self class] dbFilePath:name];
@@ -61,28 +62,29 @@ static NSMutableSet *_activeQueues = nil;
         
         self.autoResumeInterval = 0;
         self.delegate = d;
-    
+        
         
         _operationQueue = [[NSOperationQueue alloc] init];
         _operationQueue.name = name;
         _operationQueue.maxConcurrentOperationCount = 1;
         
-        [[NSNotificationCenter defaultCenter] addObserverForName:kReachabilityChangedNotification
+        
+        [[NSNotificationCenter defaultCenter] addObserverForName:AFNetworkingReachabilityDidChangeNotification
                                                           object:nil
                                                            queue:[NSOperationQueue currentQueue]
-                                                      usingBlock:^(NSNotification *aNotification) {
-                                                          Reachability *reachability = aNotification.object;
-                                                              
-                                                          NetworkStatus remoteHostStatus = reachability.currentReachabilityStatus;
-                                                      
-                                                          _isNetworkReachable = remoteHostStatus != NotReachable;
-                                                      
-                                                          if (remoteHostStatus == NotReachable) {
-                                                              DDLogInfo(@"suspend queue %@ via reachability", _name);
-                                                              [self suspended:@"reachability"];
-                                                          } else {
+                                                      usingBlock:^(NSNotification *notification) {
+                                                          NSDictionary *userInfo = notification.userInfo;
+                                                          
+                                                          NSInteger status = [[userInfo objectForKey:AFNetworkingReachabilityNotificationStatusItem] integerValue];
+                                                          
+                                                          _isNetworkReachable = ((status == AFNetworkReachabilityStatusReachableViaWWAN) || status == (AFNetworkReachabilityStatusReachableViaWiFi));
+                                                          
+                                                          if (_isNetworkReachable) {
                                                               DDLogInfo(@"try resume queue %@ via reachability", _name);
                                                               [self tryAutoResume:@"Network reachable again"];
+                                                          } else {
+                                                              DDLogInfo(@"suspend queue %@ via reachability", _name);
+                                                              [self suspended:@"reachability"];
                                                           }
                                                       }];
         
@@ -130,7 +132,7 @@ static NSMutableSet *_activeQueues = nil;
 
 -(void)openDB {
     DDLogInfo(@"Is SQLite compiled with it's thread safe options turned on? %@!", [FMDatabase isSQLiteThreadSafe] ? @"Yes" : @"No");
-
+    
     
     __block bool isNewQueue = YES;
     [self.dbQueue inDatabase:^(FMDatabase *db) {
@@ -163,6 +165,7 @@ static NSMutableSet *_activeQueues = nil;
                  raise];
             }
             
+            //            [self clear];
             [self clearOperations];
         } else {
             isNewQueue = NO;
@@ -186,7 +189,7 @@ static NSMutableSet *_activeQueues = nil;
         // when waiting for a job only finishJob can resume the queue
         return;
     }
-
+    
     if  (_stopped) {
         // if the queue is manually stop we can't auto resume
         return;
@@ -233,7 +236,6 @@ static NSMutableSet *_activeQueues = nil;
             
             if (inserted == FALSE) {
                 DDLogCritical(@"CRITICAL: Failed to insert task table %@", error);
-                
                 NSDictionary *userInfo;
                 
                 if (error) {
@@ -281,6 +283,7 @@ static NSMutableSet *_activeQueues = nil;
     [self backgroundTaskBlock:^{
         [_operationQueue cancelAllOperations];
     }];
+    
 }
 
 - (void)clear {
